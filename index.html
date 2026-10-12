@@ -24,6 +24,8 @@
       --node-parent: #d97706;
       --node-hole: rgba(244, 63, 94, 0.15);
       --node-hole-border: #f43f5e;
+      --node-stale: rgba(251, 191, 36, 0.18);
+      --node-stale-border: #fbbf24;
       --node-key: #10b981;
     }
 
@@ -180,15 +182,6 @@
     }
 
     /* 播放与单步控制栏 */
-    .playback-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding-top: 4px;
-    }
-
     .action-controls {
       display: flex;
       flex-wrap: wrap;
@@ -305,6 +298,40 @@
       text-align: center;
     }
 
+    /* 视图模式切换控件 */
+    .view-mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn.active {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+    }
+
+    .mode-btn:hover:not(.active) {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
     /* 序列进度流水线 (Pipeline) */
     .seq-pipeline-bar {
       display: flex;
@@ -396,6 +423,8 @@
       margin-bottom: 12px;
       padding-bottom: 8px;
       border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .card-title {
@@ -647,6 +676,13 @@
       animation: pulse-border 1.5s infinite;
     }
 
+    .array-cell.stale-slot {
+      background: var(--node-stale);
+      border: 2px dashed var(--node-stale-border);
+      color: var(--node-stale-border);
+      animation: pulse-stale 1.5s infinite;
+    }
+
     .array-cell.parent-highlight {
       border-color: var(--warning);
       box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
@@ -703,9 +739,19 @@
       color: #fff;
     }
 
+    .pointer-stale {
+      background: #b45309;
+      color: #fef3c7;
+    }
+
     @keyframes pulse-border {
       0%, 100% { border-color: #f43f5e; box-shadow: 0 0 5px rgba(244, 63, 94, 0.3); }
       50% { border-color: #fb7185; box-shadow: 0 0 14px rgba(244, 63, 94, 0.6); }
+    }
+
+    @keyframes pulse-stale {
+      0%, 100% { border-color: #fbbf24; box-shadow: 0 0 5px rgba(251, 191, 36, 0.3); }
+      50% { border-color: #f59e0b; box-shadow: 0 0 14px rgba(251, 191, 36, 0.6); }
     }
 
     /* 右侧面板：源码追踪与状态监控 */
@@ -964,9 +1010,9 @@
       <div class="title-group">
         <h1>
           PriorityQueue#siftUpComparable
-          <span class="badge">JDK 源码级仿真 &amp; 自定义重试</span>
+          <span class="badge">JDK 源码级仿真 &amp; 物理内存透析</span>
         </h1>
-        <p>支持自由输入自定义数据序列、一键重试重放、多种典型测试场景切换及数组二叉树映射公式推导。</p>
+        <p>揭秘一维连续 Array 如何通过纯代数公式实现完全二叉堆，透视物理内存脏数据残留与算法抽象空穴真相。</p>
       </div>
 
       <!-- 单步与速度控制栏 -->
@@ -1052,10 +1098,22 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2v6m0 0l-5 5m5-5l5 5M7 13v7m10-7v7" />
             </svg>
-            逻辑视图：二叉小顶堆 (Binary Heap Tree)
-            <span style="font-size: 11px; color: var(--accent); font-weight: normal; margin-left: 8px;">(提示：点击任意节点可激活父子代数推导探针)</span>
+            <span id="view-mode-title">二叉堆视图：逻辑抽象模型 (空穴模型)</span>
+            <span style="font-size: 11px; color: var(--accent); font-weight: normal; margin-left: 8px;">(提示：点击任意节点激活代数映射探针)</span>
           </div>
-          <div class="card-badge" id="tree-status-badge">有效节点数: 0</div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <!-- 视图模式切换 -->
+            <div class="view-mode-toggle">
+              <button class="mode-btn active" id="btn-mode-logical" title="经典教学：将待覆写坑位抽象为‘空穴’">
+                逻辑抽象 (空穴模型)
+              </button>
+              <button class="mode-btn" id="btn-mode-physical" title="真实硬件视角：真实展示内存中的旧数据残留与覆写">
+                物理内存真实态 (JVM 堆实际值)
+              </button>
+            </div>
+            <div class="card-badge" id="tree-status-badge">有效节点数: 0</div>
+          </div>
         </div>
 
         <!-- 当前数据流水线状态条 (Sequence Pipeline) -->
@@ -1093,9 +1151,9 @@
               <span class="legend-dot" style="background: var(--node-parent); box-shadow: 0 0 6px var(--warning);"></span>
               <span>比较父节点 (parent)</span>
             </div>
-            <div class="legend-item">
+            <div class="legend-item" id="legend-hole-item">
               <span class="legend-dot" style="background: var(--node-hole-border); border: 1px dashed #fff;"></span>
-              <span>空穴 (Hole / k)</span>
+              <span id="legend-hole-text">空穴 (Hole / k)</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot" style="background: var(--node-key);"></span>
@@ -1145,7 +1203,7 @@
               <path d="M7 7v10M12 7v10M17 7v10" />
             </svg>
             物理视图：底层连续数组 (Object[] queue)
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 8px;">(点击任意单元格同样可测试探针公式)</span>
+            <span id="array-mode-hint" style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 8px;">(当前为逻辑抽象模式：高亮显示空穴)</span>
           </div>
           <div class="card-badge" id="array-capacity-badge">queue.length = 11</div>
         </div>
@@ -1198,7 +1256,7 @@
 
         <div class="var-grid">
           <div class="var-item">
-            <span class="var-name">k (空穴索引)</span>
+            <span class="var-name">k (当前指针)</span>
             <span class="var-value" id="val-k">-</span>
           </div>
           <div class="var-item">
@@ -1331,7 +1389,20 @@
         </p>
         <p>
           因此，<code>while (k > 0)</code> 既是循环到达堆顶的天然终止条件，也是防止无符号位移下溢的绝对安全屏障。
-          同时，结合<strong>空穴上浮单向覆盖</strong>，省去了至少一半的内存写指令。
+        </p>
+      </div>
+
+      <!-- 维度 5: 真实物理内存 vs 逻辑空穴 -->
+      <div class="know-card" style="border-left: 3px solid var(--accent); grid-column: 1 / -1;">
+        <h4>🤔 5. 内存里真的有个“空洞”吗？—— 物理内存脏数据残留 VS 算法逻辑空穴</h4>
+        <p>
+          <strong>你看到的“穴”，在真实的 JVM 物理内存里其实是一份残留的旧数据！</strong>
+        </p>
+        <p>
+          在执行 <code>queue[k] = e</code> 时，父节点的值只是被<strong>单向拷贝</strong>到了子节点。JDK <strong>绝不会多写一行 <code>queue[parent] = null</code></strong>，因为在计算机硬件体系中，多一次内存写操作（Store）会浪费 CPU 时钟周期并污染 CPU 缓存行（Dirty Cache Line）。
+        </p>
+        <p>
+          因此在循环中间，<strong>物理内存中实际上同时存在两个完全相同的父节点值</strong>（例如同时有两个 5）！所谓“空穴”，是经典算法教材（Weiss《数据结构与算法分析》、Knuth）为了便于人类思维理解引入的<strong>逻辑抽象概念</strong>。点击上方<strong>【物理内存真实态】</strong>按钮即可亲眼验证这一真实内存全貌！
         </p>
       </div>
     </div>
@@ -1340,13 +1411,17 @@
   <script>
     /**
      * PriorityQueue siftUpComparable 状态机模拟核心
-     * 严谨复刻 OpenJDK 的原子微指令步骤，支持全自定义数据集、重试重放与交互探针
+     * 严谨复刻 OpenJDK 的原子微指令步骤，支持全自定义数据集、重试重放、交互探针及【物理内存真实态 / 逻辑抽象态】双视图
      */
     class SiftUpVisualizer {
       constructor() {
         this.capacity = 11;
         this.queue = new Array(this.capacity).fill(null);
+        this.physicalQueue = new Array(this.capacity).fill(null);
         this.size = 0;
+
+        // 当前视图模式: 'logical' (经典空穴模型) | 'physical' (真实 JVM 内存残留模型)
+        this.viewMode = 'logical';
 
         // 当前加载的数据集
         this.currentDataset = [5, 1, 3, 8, 2];
@@ -1376,6 +1451,12 @@
           treeProbeEdges: document.getElementById('tree-probe-edges'),
           treeNodes: document.getElementById('tree-nodes'),
           treeStatusBadge: document.getElementById('tree-status-badge'),
+          viewModeTitle: document.getElementById('view-mode-title'),
+          btnModeLogical: document.getElementById('btn-mode-logical'),
+          btnModePhysical: document.getElementById('btn-mode-physical'),
+          legendHoleItem: document.getElementById('legend-hole-item'),
+          legendHoleText: document.getElementById('legend-hole-text'),
+          arrayModeHint: document.getElementById('array-mode-hint'),
           floatingKeyBox: document.getElementById('floating-key-box'),
           floatingKeyVal: document.getElementById('floating-key-val'),
           arrayGrid: document.getElementById('array-grid'),
@@ -1463,6 +1544,10 @@
       }
 
       bindEvents() {
+        // 模式切换
+        this.dom.btnModeLogical.addEventListener('click', () => this.setViewMode('logical'));
+        this.dom.btnModePhysical.addEventListener('click', () => this.setViewMode('physical'));
+
         // 自定义序列加载并执行
         this.dom.btnRunCustom.addEventListener('click', () => {
           const arr = this.parseInputSequence(this.dom.inputSequence.value);
@@ -1478,14 +1563,14 @@
           }
         });
 
-        // 快捷按键：回车键提交运行
+        // 回车提交
         this.dom.inputSequence.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
             this.dom.btnRunCustom.click();
           }
         });
 
-        // 重试当前数据 (Retry)
+        // 重试当前数据
         this.dom.btnRetry.addEventListener('click', () => {
           this.retryCurrentSequence();
         });
@@ -1501,7 +1586,7 @@
           this.updateActiveChip(null);
         });
 
-        // 预设芯片点击切换
+        // 预设芯片点击
         this.dom.presetChips.forEach(chip => {
           chip.addEventListener('click', () => {
             const seqStr = chip.getAttribute('data-seq');
@@ -1535,6 +1620,25 @@
         });
       }
 
+      // 切换视图模式
+      setViewMode(mode) {
+        this.viewMode = mode;
+        this.dom.btnModeLogical.classList.toggle('active', mode === 'logical');
+        this.dom.btnModePhysical.classList.toggle('active', mode === 'physical');
+
+        if (mode === 'logical') {
+          this.dom.viewModeTitle.textContent = "二叉堆视图：逻辑抽象模型 (空穴模型)";
+          this.dom.legendHoleText.textContent = "空穴 (Hole / k)";
+          this.dom.arrayModeHint.textContent = "(当前为逻辑抽象模式：高亮显示待填充空穴)";
+        } else {
+          this.dom.viewModeTitle.textContent = "二叉堆视图：物理内存真实态 (JVM 堆实际值与脏数据)";
+          this.dom.legendHoleText.textContent = "待覆写残留值 (Stale/Dirty)";
+          this.dom.arrayModeHint.textContent = "(当前为物理内存真实模式：展示内存中的真实残留旧数据与重复值)";
+        }
+
+        this.renderCurrentState();
+      }
+
       updateActiveChip(targetChip) {
         this.dom.presetChips.forEach(chip => {
           chip.classList.toggle('active', chip === targetChip);
@@ -1548,13 +1652,15 @@
         this.dom.inputSequence.value = arr.join(', ');
 
         this.queue = new Array(this.capacity).fill(null);
+        this.physicalQueue = new Array(this.capacity).fill(null);
         this.size = 0;
         this.history = [];
         this.currentIndex = 0;
 
         this.createSnapshot(`准备载入测试序列：[${arr.join(', ')}]。点击下一步或播放开始逐个插入。`, {
           title: "数据序列就绪",
-          highlightLine: 0
+          highlightLine: 0,
+          physicalDesc: `准备载入测试序列：[${arr.join(', ')}]。在物理内存模式下，你将亲眼目睹 JVM 堆中的旧数据残留与覆写！`
         });
 
         arr.forEach(val => this.recordOfferLifecycle(val));
@@ -1636,6 +1742,8 @@
       createSnapshot(desc, options = {}) {
         const snap = {
           queue: [...this.queue],
+          physicalQueue: [...this.physicalQueue],
+          staleIndex: options.staleIndex !== undefined ? options.staleIndex : null,
           size: this.size,
           k: options.k !== undefined ? options.k : null,
           key: options.key !== undefined ? options.key : null,
@@ -1646,6 +1754,7 @@
           highlightLine: options.highlightLine || 0,
           title: options.title || "执行步骤",
           desc: desc,
+          physicalDesc: options.physicalDesc || desc,
           tip: options.tip || null,
         };
         this.history.push(snap);
@@ -1661,16 +1770,19 @@
           title: `offer(${x}) 开始`,
           highlightLine: 1,
           key: x,
-          tip: i === 0 ? "这是队列中的首个元素，将直接放入根节点 queue[0]，无需任何堆调整。" : `非根节点插入，将触发 siftUp(k = ${i}, x = ${x})。`
+          tip: i === 0 ? "这是队列中的首个元素，将直接放入根节点 queue[0]，无需任何堆调整。" : `非根节点插入，将触发 siftUp(k = ${i}, x = ${x})。`,
+          physicalDesc: `调用 queue.offer(${x})。分配下标 i = ${i}。此时底层物理内存 queue[${i}] 实际值为 null。`
         });
 
         if (i === 0) {
           this.queue[0] = x;
+          this.physicalQueue[0] = x;
           this.createSnapshot(`因为 i == 0（空堆），直接执行 queue[0] = ${x}。堆顶建立完毕！`, {
             title: `直接写入根节点`,
             highlightLine: 11,
             key: x,
-            k: 0
+            k: 0,
+            physicalDesc: `执行物理写入 queue[0] = ${x}。堆顶内存单元完成赋值！`
           });
           return;
         }
@@ -1686,7 +1798,9 @@
           k: k,
           key: key,
           holeIndex: k,
-          tip: "【JDK 关键优化】注意此时并不急着将数据写入 queue[k]，而是让空穴向上攀爬，减少交换开销！"
+          staleIndex: k,
+          tip: "【JDK 关键优化】注意此时并不急着将数据写入 queue[k]，而是让空穴向上攀爬，减少交换开销！",
+          physicalDesc: `将 ${key} 保存在局部变量 key 中。此时物理内存 queue[${k}] 依然是 null，逻辑上作为首个待填入位置。`
         });
 
         while (k > 0) {
@@ -1696,7 +1810,9 @@
             highlightLine: 3,
             k: k,
             key: key,
-            holeIndex: k
+            holeIndex: k,
+            staleIndex: k,
+            physicalDesc: `检查 k = ${k} > 0。指针尚未到达堆顶，继续向上定位父节点内存地址。`
           });
 
           // Line 4: 计算 parent = (k - 1) >>> 1
@@ -1708,7 +1824,9 @@
             key: key,
             parent: parent,
             holeIndex: k,
-            tip: "位运算 (k - 1) >>> 1 比除以 2 更加高效，是完全二叉树父子节点映射的核心计算！"
+            staleIndex: k,
+            tip: "位运算 (k - 1) >>> 1 比除以 2 更加高效，是完全二叉树父子节点映射的核心计算！",
+            physicalDesc: `计算得到父节点的物理下标 parent = (${k} - 1) >>> 1 = ${parent}。`
           });
 
           // Line 5: 获取父节点 Object e = queue[parent]
@@ -1720,7 +1838,9 @@
             key: key,
             parent: parent,
             e: e,
-            holeIndex: k
+            holeIndex: k,
+            staleIndex: k,
+            physicalDesc: `读取父节点内存槽中的数据：e = queue[${parent}] = ${e}。准备与 key(${key}) 进行大小判定。`
           });
 
           // Line 6: 比较 key 与父节点 e
@@ -1735,7 +1855,9 @@
               e: e,
               cmpResult: true,
               holeIndex: k,
-              tip: `堆序性已恢复：当前空穴位置 k = ${k} 正好就是 ${key} 的合法居所。`
+              staleIndex: k,
+              tip: `堆序性已恢复：当前空穴位置 k = ${k} 正好就是 ${key} 的合法居所。`,
+              physicalDesc: `比较 key(${key}) >= e(${e}) 为 true。堆序恢复，停止上移！当前指针位置 k = ${k} 将作为最终覆写落点。`
             });
 
             // Line 7: break
@@ -1744,7 +1866,9 @@
               highlightLine: 7,
               k: k,
               key: key,
-              holeIndex: k
+              holeIndex: k,
+              staleIndex: k,
+              physicalDesc: `触发 break。当前待覆写坑位最终确定在下标 k = ${k}。`
             });
             break;
           } else {
@@ -1757,11 +1881,14 @@
               e: e,
               cmpResult: false,
               holeIndex: k,
-              tip: `由于 key(${key}) 比父节点(${e}) 更小，所以父节点 ${e} 必须移下来给更小者让位。`
+              staleIndex: k,
+              tip: `由于 key(${key}) 比父节点(${e}) 更小，所以父节点 ${e} 必须移下来给更小者让位。`,
+              physicalDesc: `比较 key(${key}) < e(${e})。子节点比父节点更小，打破小顶堆性质，父节点值 ${e} 必须下移。`
             });
 
             // Line 8: 父节点下移 queue[k] = e
             this.queue[k] = e;
+            this.physicalQueue[k] = e; // 物理拷贝！此时 physicalQueue[parent] 依然为 e！
             this.createSnapshot(`执行 queue[${k}] = e (${e})：父节点值下移滑入当前空穴。位置 ${k} 填入 ${e}，空穴转移至位置 ${parent}！`, {
               title: `父节点下移 (Sliding Down)`,
               highlightLine: 8,
@@ -1770,7 +1897,9 @@
               parent: parent,
               e: e,
               holeIndex: parent,
-              tip: "重点：此处单向移动父节点，完全没有 swap 交换操作，极大提升了 CPU 缓存效率！"
+              staleIndex: parent,
+              tip: "【物理真相】此时内存中执行 queue[k] = e，原父节点位置并没有被设为 null，依然存着旧值 " + e + "！内存中实际同时存在两个 " + e + "！",
+              physicalDesc: `【物理内存真相】执行单向物理写入 queue[${k}] = ${e}。注意看：原父节点位置 queue[${parent}] 并没有被清空为 null，它依然存着旧值 ${e}！此时内存中实际同时存在两份 ${e}（见高亮黄色待覆写标签）！`
             });
 
             // Line 9: 空穴上移 k = parent
@@ -1780,7 +1909,9 @@
               highlightLine: 9,
               k: k,
               key: key,
-              holeIndex: k
+              holeIndex: k,
+              staleIndex: k,
+              physicalDesc: `更新指针 k = parent = ${parent}。位置 ${parent} 的数据已成为废弃脏数据，将在后续被覆写。`
             });
           }
         }
@@ -1792,18 +1923,22 @@
             highlightLine: 3,
             k: 0,
             key: key,
-            holeIndex: 0
+            holeIndex: 0,
+            staleIndex: 0,
+            physicalDesc: `指针已到达根节点 0。准备将暂存的 key 物理写入根节点，完成最后的覆写！`
           });
         }
 
         // Line 11: 填入空穴 queue[k] = key
         this.queue[k] = key;
+        this.physicalQueue[k] = key; // 正式覆写废弃值！
         this.createSnapshot(`执行 queue[${k}] = key (${key})：将暂存的 key 正式写入最终空穴！offer(${key}) 成功！`, {
           title: `落穴完成 (queue[k] = key)`,
           highlightLine: 11,
           k: k,
           key: key,
-          tip: `当前堆中全部元素：[${this.queue.slice(0, this.size).join(', ')}]，依然严格维持二叉小顶堆性质。`
+          tip: `当前堆中全部元素：[${this.queue.slice(0, this.size).join(', ')}]，依然严格维持二叉小顶堆性质。`,
+          physicalDesc: `【覆写完成】执行物理写入 queue[${k}] = ${key}！之前残留的废弃旧数据被彻底覆盖为新值。物理数组恢复为合法的小顶堆状态！`
         });
       }
 
@@ -1817,6 +1952,7 @@
         if (this.currentIndex < this.history.length - 1) {
           const latest = this.history[this.history.length - 1];
           this.queue = [...latest.queue];
+          this.physicalQueue = [...latest.physicalQueue];
           this.size = latest.size;
         }
         this.currentDataset.push(val);
@@ -1829,12 +1965,14 @@
       reset() {
         this.pause();
         this.queue = new Array(this.capacity).fill(null);
+        this.physicalQueue = new Array(this.capacity).fill(null);
         this.size = 0;
         this.history = [];
         this.currentIndex = 0;
         this.createSnapshot("已重置为空堆。请点击“加载并运行”或“重试当前数据”。", {
           title: "堆重置完毕",
-          highlightLine: 0
+          highlightLine: 0,
+          physicalDesc: "物理内存已重置，所有数组槽位恢复为 null。"
         });
         this.renderCurrentState();
       }
@@ -1927,9 +2065,14 @@
           this.dom.floatingKeyBox.style.display = 'none';
         }
 
-        // 4. 叙事文本
+        // 4. 叙事文本（根据当前视图模式展示不同侧重解读）
         this.dom.narrativeTitle.textContent = snap.title;
-        this.dom.narrativeDesc.textContent = snap.desc;
+        if (this.viewMode === 'physical') {
+          this.dom.narrativeDesc.textContent = snap.physicalDesc || snap.desc;
+        } else {
+          this.dom.narrativeDesc.textContent = snap.desc;
+        }
+
         if (snap.tip) {
           this.dom.narrativeTip.style.display = 'flex';
           this.dom.narrativeTipText.textContent = snap.tip;
@@ -1977,28 +2120,52 @@
         const leftProbe = 2 * this.probeIndex + 1;
         const rightProbe = 2 * this.probeIndex + 2;
 
+        const isPhysical = (this.viewMode === 'physical');
+
         for (let i = 0; i < this.capacity; i++) {
           const cell = document.getElementById(`cell-${i}`);
           const tags = document.getElementById(`tags-${i}`);
           if (!cell || !tags) continue;
 
           tags.innerHTML = '';
-          const val = snap.queue[i];
+          const logicalVal = snap.queue[i];
+          const physicalVal = snap.physicalQueue[i];
 
           cell.className = 'array-cell';
 
-          if (i === snap.holeIndex) {
-            // 当前是空穴
-            cell.classList.add('hole');
-            cell.textContent = '穴 (k)';
-          } else if (val !== null) {
-            cell.textContent = val;
-            if (i === snap.parent) {
-              cell.classList.add('parent-highlight');
+          if (isPhysical) {
+            // === 物理内存真实视图 ===
+            if (i === snap.staleIndex && snap.staleIndex !== null) {
+              // 处于脏数据/待覆写状态
+              cell.classList.add('stale-slot');
+              cell.textContent = physicalVal !== null ? physicalVal : 'null';
+              const badge = document.createElement('span');
+              badge.className = 'pointer-badge pointer-stale';
+              badge.textContent = '待覆写';
+              tags.appendChild(badge);
+            } else if (physicalVal !== null) {
+              cell.textContent = physicalVal;
+              if (i === snap.parent) {
+                cell.classList.add('parent-highlight');
+              }
+            } else {
+              cell.classList.add('empty');
+              cell.textContent = 'null';
             }
           } else {
-            cell.classList.add('empty');
-            cell.textContent = '-';
+            // === 逻辑抽象视图 (空穴模型) ===
+            if (i === snap.holeIndex) {
+              cell.classList.add('hole');
+              cell.textContent = '穴 (k)';
+            } else if (logicalVal !== null) {
+              cell.textContent = logicalVal;
+              if (i === snap.parent) {
+                cell.classList.add('parent-highlight');
+              }
+            } else {
+              cell.classList.add('empty');
+              cell.textContent = '-';
+            }
           }
 
           // 探针模式下的特殊边框渲染
@@ -2053,10 +2220,13 @@
         this.dom.treeProbeEdges.innerHTML = '';
         this.dom.treeNodes.innerHTML = '';
 
+        const isPhysical = (this.viewMode === 'physical');
+
         // 展示节点数：至少包含探针关联的节点以及当前已有的节点
         const activeMax = Math.max(
           snap.size,
           snap.holeIndex !== null ? snap.holeIndex + 1 : 0,
+          snap.staleIndex !== null ? snap.staleIndex + 1 : 0,
           this.probeIndex + 1,
           2 * this.probeIndex + 3
         );
@@ -2107,7 +2277,8 @@
         // 3. 绘制节点
         for (let i = 0; i < nodeCount; i++) {
           const coord = this.getNodeCoord(i);
-          const val = (i < snap.queue.length) ? snap.queue[i] : null;
+          const logicalVal = (i < snap.queue.length) ? snap.queue[i] : null;
+          const physicalVal = (i < snap.physicalQueue.length) ? snap.physicalQueue[i] : null;
 
           const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
           g.setAttribute('transform', `translate(${coord.x}, ${coord.y})`);
@@ -2158,36 +2329,75 @@
           }
 
           // 样式判定
-          if (i === snap.holeIndex) {
-            // 空穴状态
-            circle.setAttribute('fill', 'rgba(244, 63, 94, 0.15)');
-            circle.setAttribute('stroke', '#f43f5e');
-            circle.setAttribute('stroke-width', '2.5');
-            circle.setAttribute('stroke-dasharray', '5,3');
-            text.setAttribute('fill', '#f43f5e');
-            text.setAttribute('font-size', '11');
-            text.textContent = '穴';
-          } else if (i === snap.parent) {
-            // 算法执行中的父节点
-            circle.setAttribute('fill', '#d97706');
-            circle.setAttribute('stroke', '#fbbf24');
-            circle.setAttribute('stroke-width', '3');
-            text.setAttribute('fill', '#ffffff');
-            text.textContent = val !== null ? val : '';
-          } else if (val !== null) {
-            // 正常填充节点
-            circle.setAttribute('fill', '#0284c7');
-            circle.setAttribute('stroke', '#38bdf8');
-            circle.setAttribute('stroke-width', '1.5');
-            text.setAttribute('fill', '#ffffff');
-            text.textContent = val;
+          if (isPhysical) {
+            // === 物理模式 ===
+            if (i === snap.staleIndex && snap.staleIndex !== null) {
+              // 待覆写的旧数据残留位置
+              circle.setAttribute('fill', 'rgba(251, 191, 36, 0.18)');
+              circle.setAttribute('stroke', '#fbbf24');
+              circle.setAttribute('stroke-width', '2.5');
+              circle.setAttribute('stroke-dasharray', '4,2');
+              text.setAttribute('fill', '#fbbf24');
+              text.setAttribute('font-size', '12');
+              text.textContent = physicalVal !== null ? physicalVal : 'null';
+
+              // 底部附加小标记
+              const staleLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+              staleLabel.setAttribute('text-anchor', 'middle');
+              staleLabel.setAttribute('dy', '36');
+              staleLabel.setAttribute('fill', '#fbbf24');
+              staleLabel.setAttribute('font-size', '9');
+              staleLabel.textContent = '待覆写';
+              g.appendChild(staleLabel);
+            } else if (i === snap.parent) {
+              circle.setAttribute('fill', '#d97706');
+              circle.setAttribute('stroke', '#fbbf24');
+              circle.setAttribute('stroke-width', '3');
+              text.setAttribute('fill', '#ffffff');
+              text.textContent = physicalVal !== null ? physicalVal : '';
+            } else if (physicalVal !== null) {
+              circle.setAttribute('fill', '#0284c7');
+              circle.setAttribute('stroke', '#38bdf8');
+              circle.setAttribute('stroke-width', '1.5');
+              text.setAttribute('fill', '#ffffff');
+              text.textContent = physicalVal;
+            } else {
+              circle.setAttribute('fill', '#1e293b');
+              circle.setAttribute('stroke', '#334155');
+              circle.setAttribute('stroke-width', '1');
+              text.setAttribute('fill', '#475569');
+              text.textContent = 'null';
+              text.setAttribute('font-size', '11');
+            }
           } else {
-            // 空白占位节点
-            circle.setAttribute('fill', '#1e293b');
-            circle.setAttribute('stroke', '#334155');
-            circle.setAttribute('stroke-width', '1');
-            text.setAttribute('fill', '#475569');
-            text.textContent = '-';
+            // === 逻辑抽象模式 (空穴) ===
+            if (i === snap.holeIndex) {
+              circle.setAttribute('fill', 'rgba(244, 63, 94, 0.15)');
+              circle.setAttribute('stroke', '#f43f5e');
+              circle.setAttribute('stroke-width', '2.5');
+              circle.setAttribute('stroke-dasharray', '5,3');
+              text.setAttribute('fill', '#f43f5e');
+              text.setAttribute('font-size', '11');
+              text.textContent = '穴';
+            } else if (i === snap.parent) {
+              circle.setAttribute('fill', '#d97706');
+              circle.setAttribute('stroke', '#fbbf24');
+              circle.setAttribute('stroke-width', '3');
+              text.setAttribute('fill', '#ffffff');
+              text.textContent = logicalVal !== null ? logicalVal : '';
+            } else if (logicalVal !== null) {
+              circle.setAttribute('fill', '#0284c7');
+              circle.setAttribute('stroke', '#38bdf8');
+              circle.setAttribute('stroke-width', '1.5');
+              text.setAttribute('fill', '#ffffff');
+              text.textContent = logicalVal;
+            } else {
+              circle.setAttribute('fill', '#1e293b');
+              circle.setAttribute('stroke', '#334155');
+              circle.setAttribute('stroke-width', '1');
+              text.setAttribute('fill', '#475569');
+              text.textContent = '-';
+            }
           }
 
           g.appendChild(circle);
