@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>siftup | PriorityQueue #siftUpComparable 核心原理动画演示与交互实验室</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --accent: #818cf8;
+      --purple: #c084fc;
+      --code-bg: #090d16;
+      --node-solid: #0284c7;
+      --node-parent: #d97706;
+      --node-hole: rgba(244, 63, 94, 0.15);
+      --node-hole-border: #f43f5e;
+      --node-key: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 顶部标题与控制面板 */
+    header {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title-group h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .title-group h1 span.badge {
+      font-size: 11px;
+      background: var(--accent);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .title-group p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* 数据集与自定义控制栏 */
+    .dataset-control-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+
+    .dataset-input-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dataset-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .seq-input-wrap {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .seq-input-wrap input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #fff;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      padding: 7px 12px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .seq-input-wrap input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    .preset-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .chips-label {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .chip-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 3px 10px;
+      border-radius: 16px;
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip-btn:hover {
+      background: #334155;
+      color: #fff;
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .chip-btn.active {
+      background: rgba(129, 140, 248, 0.2);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* 播放与单步控制栏 */
+    .playback-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .action-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: #f1f5f9;
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-success {
+      background: #059669;
+      box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #047857;
+    }
+
+    .btn-amber {
+      background: #d97706;
+      box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+    }
+
+    .btn-amber:hover:not(:disabled) {
+      background: #b45309;
+    }
+
+    .btn-purple {
+      background: #7c3aed;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+    }
+
+    .btn-purple:hover:not(:disabled) {
+      background: #6d28d9;
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #090d16;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .speed-control select {
+      background: transparent;
+      color: var(--text-main);
+      border: none;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .input-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #090d16;
+      padding: 3px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .input-box input {
+      width: 50px;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 13px;
+      padding: 4px 6px;
+      outline: none;
+      text-align: center;
+    }
+
+    /* 序列进度流水线 (Pipeline) */
+    .seq-pipeline-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .pipeline-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .pipeline-chips-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pipe-badge {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #94a3b8;
+      transition: all 0.2s ease;
+    }
+
+    .pipe-badge.active {
+      border-color: var(--node-key);
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--node-key);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      transform: scale(1.08);
+    }
+
+    .pipe-badge.done {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+    }
+
+    /* 主网格布局 */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 430px;
+      gap: 16px;
+      flex: 1;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 左侧可视化区域 */
+    .vis-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-badge {
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* 树形视图 */
+    .tree-viewport {
+      height: 340px;
+      position: relative;
+      background: #090d16;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    svg.tree-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 悬浮变量展示板 (Floating Key Display) */
+    .floating-key-box {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      z-index: 10;
+    }
+
+    .floating-key-box .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .floating-key-box .val-badge {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 15px;
+      font-weight: 700;
+      background: var(--node-key);
+      color: #fff;
+      padding: 2px 10px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+
+    .tree-legend {
+      position: absolute;
+      bottom: 10px;
+      right: 14px;
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.8);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* 映射探针展示横幅 (Mapping Probe Panel) */
+    .probe-panel {
+      background: #111827;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(129, 140, 248, 0.15);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .probe-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .probe-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .probe-selected-badge {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      background: rgba(129, 140, 248, 0.2);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+    }
+
+    .probe-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+
+    .probe-calc-card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .probe-calc-card.parent-card {
+      border-left: 3px solid var(--warning);
+    }
+
+    .probe-calc-card.left-card {
+      border-left: 3px solid var(--primary);
+    }
+
+    .probe-calc-card.right-card {
+      border-left: 3px solid var(--purple);
+    }
+
+    .calc-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .calc-formula {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .calc-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    /* 底层物理数组视图 */
+    .array-container {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    .array-grid {
+      display: flex;
+      gap: 10px;
+      min-height: 90px;
+      align-items: flex-start;
+      padding-bottom: 8px;
+    }
+
+    .array-cell-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 62px;
+      cursor: pointer;
+    }
+
+    .array-index-label {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .array-cell {
+      width: 58px;
+      height: 52px;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .array-cell:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .array-cell.empty {
+      background: rgba(255,255,255,0.02);
+      border-style: dashed;
+      color: #475569;
+      font-size: 12px;
+    }
+
+    .array-cell.hole {
+      background: var(--node-hole);
+      border: 2px dashed var(--node-hole-border);
+      color: var(--node-hole-border);
+      animation: pulse-border 1.5s infinite;
+    }
+
+    .array-cell.parent-highlight {
+      border-color: var(--warning);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+      background: rgba(217, 119, 6, 0.2);
+    }
+
+    .array-cell.probe-current {
+      border-color: var(--node-key) !important;
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.6) !important;
+      background: rgba(16, 185, 129, 0.25) !important;
+    }
+
+    .array-cell.probe-parent {
+      border-color: var(--warning) !important;
+      box-shadow: 0 0 14px rgba(251, 191, 36, 0.6) !important;
+      background: rgba(217, 119, 6, 0.25) !important;
+    }
+
+    .array-cell.probe-left {
+      border-color: var(--primary) !important;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.6) !important;
+      background: rgba(56, 189, 248, 0.25) !important;
+    }
+
+    .array-cell.probe-right {
+      border-color: var(--purple) !important;
+      box-shadow: 0 0 14px rgba(192, 132, 252, 0.6) !important;
+      background: rgba(192, 132, 252, 0.25) !important;
+    }
+
+    .pointer-tags {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+      min-height: 24px;
+    }
+
+    .pointer-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .pointer-k {
+      background: #e11d48;
+      color: #fff;
+    }
+
+    .pointer-parent {
+      background: #d97706;
+      color: #fff;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { border-color: #f43f5e; box-shadow: 0 0 5px rgba(244, 63, 94, 0.3); }
+      50% { border-color: #fb7185; box-shadow: 0 0 14px rgba(244, 63, 94, 0.6); }
+    }
+
+    /* 右侧面板：源码追踪与状态监控 */
+    .inspector-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 源码追踪区 */
+    .code-panel {
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .code-header {
+      background: #111827;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .code-body {
+      padding: 8px 0;
+      overflow-x: auto;
+    }
+
+    .code-line {
+      display: flex;
+      padding: 2px 14px;
+      transition: background 0.15s ease;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-left: 3px solid var(--primary);
+    }
+
+    .line-no {
+      width: 28px;
+      color: #475569;
+      user-select: none;
+      text-align: right;
+      padding-right: 12px;
+    }
+
+    .line-content {
+      color: #cbd5e1;
+    }
+
+    .kw { color: #f472b6; font-weight: 600; }
+    .fn { color: #38bdf8; }
+    .type { color: #6ee7b7; }
+    .var { color: #fde047; }
+    .num { color: #fdba74; }
+
+    /* 变量监视看板 */
+    .var-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      background: #090d16;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .var-item {
+      background: #1e293b;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .var-name {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .var-value {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .var-value.highlight-true {
+      color: var(--success);
+    }
+
+    .var-value.highlight-false {
+      color: var(--danger);
+    }
+
+    /* 步骤说明横幅 */
+    .narrative-card {
+      background: #1e293b;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .narrative-step {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .narrative-desc {
+      font-size: 13px;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+
+    .narrative-tip {
+      font-size: 12px;
+      color: var(--warning);
+      background: rgba(251, 191, 36, 0.1);
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    /* 进度条与状态条 */
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+
+    /* 底部核心原理深析卡片 */
+    .knowledge-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .knowledge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 10px;
+    }
+
+    .knowledge-header h3 {
+      font-size: 16px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .knowledge-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .know-card {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 12.5px;
+      line-height: 1.7;
+    }
+
+    .know-card h4 {
+      font-size: 14px;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .know-card p {
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .know-card code {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      background: #1e293b;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: var(--warning);
+    }
+
+    .know-card table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 11.5px;
+    }
+
+    .know-card th, .know-card td {
+      border: 1px solid #334155;
+      padding: 6px 8px;
+      text-align: left;
+    }
+
+    .know-card th {
+      background: #1e293b;
+      color: var(--text-main);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部标题与全局控制栏 -->
+  <header>
+    <div class="header-top">
+      <div class="title-group">
+        <h1>
+          PriorityQueue#siftUpComparable
+          <span class="badge">JDK 源码级仿真 &amp; 自定义重试</span>
+        </h1>
+        <p>支持自由输入自定义数据序列、一键重试重放、多种典型测试场景切换及数组二叉树映射公式推导。</p>
+      </div>
+
+      <!-- 单步与速度控制栏 -->
+      <div class="action-controls">
+        <button class="btn btn-secondary" id="btn-reset" title="重置为空堆">
+          ⏮ 重置
+        </button>
+        <button class="btn btn-secondary" id="btn-prev" title="回退到上一个微状态">
+          ◀ 上一步
+        </button>
+        <button class="btn" id="btn-next" title="执行下一个微操作">
+          ▶ 下一步
+        </button>
+        <button class="btn btn-success" id="btn-play-pause">
+          ⏯ 自动播放
+        </button>
+
+        <div class="speed-control">
+          <span>速度:</span>
+          <select id="select-speed">
+            <option value="1500">0.5x (慢)</option>
+            <option value="900" selected>1.0x (适中)</option>
+            <option value="500">1.5x (快)</option>
+            <option value="250">2.0x (飞速)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自定义数据集控制面板 -->
+    <div class="dataset-control-panel">
+      <div class="dataset-input-row">
+        <span class="dataset-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+          自定义序列:
+        </span>
+        <div class="seq-input-wrap">
+          <input type="text" id="input-sequence" value="5, 1, 3, 8, 2" placeholder="输入整数序列，如: 5, 1, 3, 8, 2 (支持逗号、空格或负数)" />
+        </div>
+        <button class="btn btn-amber" id="btn-run-custom" title="加载并执行该序列">
+          ▶ 加载并运行
+        </button>
+        <button class="btn btn-purple" id="btn-retry" title="保留当前数据，从头重新运行演示">
+          🔄 重试当前数据
+        </button>
+        <button class="btn btn-secondary" id="btn-random-seq" title="随机生成 5 个数字">
+          🎲 随机数据
+        </button>
+
+        <!-- 单个追加 offer 输入 -->
+        <div class="input-box" style="margin-left: auto;">
+          <input type="number" id="input-offer-val" placeholder="单数" value="6" />
+          <button class="btn btn-secondary" id="btn-offer-custom" style="padding: 4px 8px; font-size: 11px;">
+            + 单独offer
+          </button>
+        </div>
+      </div>
+
+      <!-- 快速预设场景 -->
+      <div class="preset-chips-row">
+        <span class="chips-label">典型场景快选:</span>
+        <button class="chip-btn active" data-seq="5, 1, 3, 8, 2">默认用例 [5, 1, 3, 8, 2]</button>
+        <button class="chip-btn" data-seq="9, 7, 5, 3, 1">逆序完全上浮 (最坏场景) [9, 7, 5, 3, 1]</button>
+        <button class="chip-btn" data-seq="1, 3, 5, 7, 9">顺序无需上浮 (最佳场景) [1, 3, 5, 7, 9]</button>
+        <button class="chip-btn" data-seq="4, 2, 4, 1, 2">含重复元素 [4, 2, 4, 1, 2]</button>
+        <button class="chip-btn" data-seq="12, -3, 8, 0, -7">含负数测试 [12, -3, 8, 0, -7]</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 工作区 -->
+  <div class="workspace">
+
+    <!-- 左侧：二叉堆树形视图 + 底层数组视图 + 实时映射探针 -->
+    <div class="vis-container">
+      
+      <!-- 1. 逻辑二叉树卡片 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v6m0 0l-5 5m5-5l5 5M7 13v7m10-7v7" />
+            </svg>
+            逻辑视图：二叉小顶堆 (Binary Heap Tree)
+            <span style="font-size: 11px; color: var(--accent); font-weight: normal; margin-left: 8px;">(提示：点击任意节点可激活父子代数推导探针)</span>
+          </div>
+          <div class="card-badge" id="tree-status-badge">有效节点数: 0</div>
+        </div>
+
+        <!-- 当前数据流水线状态条 (Sequence Pipeline) -->
+        <div class="seq-pipeline-bar">
+          <span class="pipeline-title">数据插入流水线:</span>
+          <div class="pipeline-chips-wrapper" id="pipeline-chips">
+            <!-- 动态生成序列徽章 -->
+          </div>
+        </div>
+
+        <div class="tree-viewport" id="tree-viewport">
+          <!-- 暂存 key 悬浮徽标 -->
+          <div class="floating-key-box" id="floating-key-box" style="display: none;">
+            <span class="label">暂存变量 key =</span>
+            <span class="val-badge" id="floating-key-val">?</span>
+          </div>
+
+          <!-- SVG 绘图区 -->
+          <svg class="tree-svg" id="tree-svg" viewBox="0 0 700 340">
+            <!-- 连线层 -->
+            <g id="tree-edges"></g>
+            <!-- 探针高亮连线层 -->
+            <g id="tree-probe-edges"></g>
+            <!-- 节点层 -->
+            <g id="tree-nodes"></g>
+          </svg>
+
+          <!-- 图例 -->
+          <div class="tree-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--node-solid);"></span>
+              <span>正常节点</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--node-parent); box-shadow: 0 0 6px var(--warning);"></span>
+              <span>比较父节点 (parent)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--node-hole-border); border: 1px dashed #fff;"></span>
+              <span>空穴 (Hole / k)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--node-key);"></span>
+              <span>写入 key</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 交互式探针展示盒 (Interactive Probe Banner) -->
+      <div class="probe-panel" id="probe-panel">
+        <div class="probe-header">
+          <span class="probe-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4M12 8h.01"/>
+            </svg>
+            📐 数组与二叉树坐标映射探针 (已选中当前节点)
+          </span>
+          <span class="probe-selected-badge" id="probe-current-label">节点 [k = 1]</span>
+        </div>
+        <div class="probe-body">
+          <div class="probe-calc-card parent-card">
+            <span class="calc-tag">① 父节点计算公式 (Parent)</span>
+            <div class="calc-formula" id="probe-parent-formula">(k - 1) &gt;&gt;&gt; 1 = (1 - 1) &gt;&gt;&gt; 1 = 0</div>
+            <div class="calc-desc" id="probe-parent-desc">当前节点为左孩子(奇数)，无符号右移精准整除落入下标 0。</div>
+          </div>
+          <div class="probe-calc-card left-card">
+            <span class="calc-tag">② 左孩子计算公式 (Left Child)</span>
+            <div class="calc-formula" id="probe-left-formula">2k + 1 = 2 × 1 + 1 = 3</div>
+            <div class="calc-desc" id="probe-left-desc">指向下一层左侧分支首位，紧密存放无缝隙。</div>
+          </div>
+          <div class="probe-calc-card right-card">
+            <span class="calc-tag">③ 右孩子计算公式 (Right Child)</span>
+            <div class="calc-formula" id="probe-right-formula">2k + 2 = 2 × 1 + 2 = 4</div>
+            <div class="calc-desc" id="probe-right-desc">紧随左孩子相邻存放，共享同一个父节点。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 底层物理数组卡片 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="10" rx="2"/>
+              <path d="M7 7v10M12 7v10M17 7v10" />
+            </svg>
+            物理视图：底层连续数组 (Object[] queue)
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 8px;">(点击任意单元格同样可测试探针公式)</span>
+          </div>
+          <div class="card-badge" id="array-capacity-badge">queue.length = 11</div>
+        </div>
+
+        <div class="array-container">
+          <div class="array-grid" id="array-grid">
+            <!-- 动态填充 0..10 单元格 -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 右侧：源码单步高亮追踪 + 变量看板 + 步骤叙事 -->
+    <div class="inspector-container">
+
+      <!-- 1. 源码逐行追踪卡片 -->
+      <div class="code-panel">
+        <div class="code-header">
+          <span>PriorityQueue.java (OpenJDK)</span>
+          <span style="color: var(--accent);">siftUpComparable(int k, E x)</span>
+        </div>
+        <div class="code-body">
+          <div class="code-line" id="code-line-1"><span class="line-no">1</span><span class="line-content"><span class="kw">private void</span> <span class="fn">siftUpComparable</span>(<span class="kw">int</span> <span class="var">k</span>, <span class="type">E</span> <span class="var">x</span>) {</span></div>
+          <div class="code-line" id="code-line-2"><span class="line-no">2</span><span class="line-content">    <span class="type">Comparable</span>&lt;? <span class="kw">super</span> <span class="type">E</span>&gt; <span class="var">key</span> = (<span class="type">Comparable</span>) <span class="var">x</span>;</span></div>
+          <div class="code-line" id="code-line-3"><span class="line-no">3</span><span class="line-content">    <span class="kw">while</span> (<span class="var">k</span> &gt; <span class="num">0</span>) {</span></div>
+          <div class="code-line" id="code-line-4"><span class="line-no">4</span><span class="line-content">        <span class="kw">int</span> <span class="var">parent</span> = (<span class="var">k</span> - <span class="num">1</span>) &gt;&gt;&gt; <span class="num">1</span>;</span></div>
+          <div class="code-line" id="code-line-5"><span class="line-no">5</span><span class="line-content">        <span class="type">Object</span> <span class="var">e</span> = queue[<span class="var">parent</span>];</span></div>
+          <div class="code-line" id="code-line-6"><span class="line-no">6</span><span class="line-content">        <span class="kw">if</span> (<span class="var">key</span>.<span class="fn">compareTo</span>((<span class="type">E</span>) <span class="var">e</span>) &gt;= <span class="num">0</span>)</span></div>
+          <div class="code-line" id="code-line-7"><span class="line-no">7</span><span class="line-content">            <span class="kw">break</span>;</span></div>
+          <div class="code-line" id="code-line-8"><span class="line-no">8</span><span class="line-content">        queue[<span class="var">k</span>] = <span class="var">e</span>;</span></div>
+          <div class="code-line" id="code-line-9"><span class="line-no">9</span><span class="line-content">        <span class="var">k</span> = <span class="var">parent</span>;</span></div>
+          <div class="code-line" id="code-line-10"><span class="line-no">10</span><span class="line-content">    }</span></div>
+          <div class="code-line" id="code-line-11"><span class="line-no">11</span><span class="line-content">    queue[<span class="var">k</span>] = <span class="var">key</span>;</span></div>
+          <div class="code-line" id="code-line-12"><span class="line-no">12</span><span class="line-content">}</span></div>
+        </div>
+      </div>
+
+      <!-- 2. 变量实时看板 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            运行期变量监视器 (Variable Watcher)
+          </div>
+          <div class="card-badge" id="step-indicator">Step 0 / 0</div>
+        </div>
+
+        <div class="var-grid">
+          <div class="var-item">
+            <span class="var-name">k (空穴索引)</span>
+            <span class="var-value" id="val-k">-</span>
+          </div>
+          <div class="var-item">
+            <span class="var-name">key (暂存值)</span>
+            <span class="var-value" id="val-key" style="color: var(--node-key);">-</span>
+          </div>
+          <div class="var-item">
+            <span class="var-name">parent 索引</span>
+            <span class="var-value" id="val-parent">-</span>
+          </div>
+          <div class="var-item">
+            <span class="var-name">e = queue[parent]</span>
+            <span class="var-value" id="val-e">-</span>
+          </div>
+          <div class="var-item" style="grid-column: span 2;">
+            <span class="var-name">key.compareTo(e) &gt;= 0</span>
+            <span class="var-value" id="val-cmp">-</span>
+          </div>
+        </div>
+
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- 3. 自然语言步骤解读 -->
+      <div class="narrative-card">
+        <div class="narrative-step" id="narrative-title">准备就绪</div>
+        <div class="narrative-desc" id="narrative-desc">
+          点击上方 “▶ 加载并运行” 或 “🔄 重试当前数据”，即可开始观测 PriorityQueue 上浮的核心细节。
+        </div>
+        <div class="narrative-tip" id="narrative-tip" style="display: none;">
+          <span>💡</span>
+          <span id="narrative-tip-text"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- 底部核心原理深析卡片：原理解读专栏 -->
+  <div class="knowledge-section">
+    <div class="knowledge-header">
+      <h3>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        深度原理解剖：为什么一维 Array 仅凭代数公式就能完美实现二叉树？
+      </h3>
+      <span style="font-size: 12px; color: var(--accent);">隐式数据结构（Implicit Data Structure）的设计精髓</span>
+    </div>
+
+    <div class="knowledge-grid">
+      <!-- 维度 1: 完全二叉树的零空洞特性 -->
+      <div class="know-card">
+        <h4>🌲 1. 核心前提：完全二叉树的“零空洞”致密性</h4>
+        <p>
+          为什么普通二叉搜索树（BST）不能直接用连续数组存储？
+          因为如果是一棵极端倾斜的二叉树（退化成一条链），深度为 30 时，第 30 层节点的下标将是 <code>2³⁰ - 1 ≈ 10 亿</code>，数组绝大部分都是 <code>null</code>，空间直接崩溃！
+        </p>
+        <p>
+          而<strong>完全二叉树（Complete Binary Tree）</strong>除最后一层外全满，最后一层严格紧密靠左填充。
+          按层序编号，节点索引<strong>必定是从 0 到 N-1 严格连续的整数</strong>，与连续物理数组天生 1:1 契合，空间利用率高达 <strong>100%</strong>！
+        </p>
+      </div>
+
+      <!-- 维度 2: 公式推导与奇偶消除 -->
+      <div class="know-card">
+        <h4>📐 2. 数学推导：为什么一行 <code>(k - 1) >>> 1</code> 能秒解父节点？</h4>
+        <p>
+          在 0-based 数组中，若父节点下标为 <code>p</code>：
+        </p>
+        <p>
+          • <strong>左孩子</strong>：<code>k_left = 2p + 1</code>（必为奇数）<br>
+          • <strong>右孩子</strong>：<code>k_right = 2p + 2</code>（必为偶数）
+        </p>
+        <p>
+          <strong>逆向求父节点时，整除截断消除了分支判断</strong>：<br>
+          • 左孩子求父节点：<code>(2p + 1 - 1) / 2 = 2p / 2 = p</code><br>
+          • 右孩子求父节点：<code>(2p + 2 - 1) / 2 = (2p + 1) / 2 = p + 0.5</code>，在整数向下取整中 <strong>0.5 被直接丢弃</strong>，依然等于 <code>p</code>！
+        </p>
+        <p>
+          JDK 采用无符号右移 <code>>>> 1</code>，利用单周期 CPU 位移指令，无需任何 <code>if-else</code> 区分左右，一条指令统揽两边！
+        </p>
+      </div>
+
+      <!-- 维度 3: 硬件与内存性能对比 -->
+      <div class="know-card">
+        <h4>⚡ 3. 工程与硬件视角：Array 相比 TreeNode 的碾压级优势</h4>
+        <p>
+          用传统的链式结构 <code>class TreeNode { int val; TreeNode left, right; }</code> 不行吗？
+          工业级实现坚持用数组，是因为硬件层面的降维打击：
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>对比维度</th>
+              <th>链式 TreeNode</th>
+              <th>数组 Object[] queue</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>内存开销</strong></td>
+              <td>~40 字节/节点 (包含头信息和指针)</td>
+              <td><strong>0 指针额外开销</strong> (仅存数据)</td>
+            </tr>
+            <tr>
+              <td><strong>CPU Cache</strong></td>
+              <td>碎散分布，遍历频繁 Cache Miss</td>
+              <td><strong>连续内存预取</strong>，满命中 64B 缓存行</td>
+            </tr>
+            <tr>
+              <td><strong>GC 压力</strong></td>
+              <td>成千上万小对象，GC 停顿长</td>
+              <td><strong>仅 1 个数组对象</strong>，极度 GC 友好</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 维度 4: 空穴机制与安全守卫 -->
+      <div class="know-card">
+        <h4>🛡️ 4. 源码细节：为什么是 <code>while (k > 0)</code> 安全守卫？</h4>
+        <p>
+          若当前节点已是根节点 <code>k = 0</code>，如果冒然执行 <code>(0 - 1) >>> 1</code>：<br>
+          在 Java 中 <code>-1 >>> 1 = 2147483647 (Integer.MAX_VALUE)</code>，会导致数组下标越界崩溃！
+        </p>
+        <p>
+          因此，<code>while (k > 0)</code> 既是循环到达堆顶的天然终止条件，也是防止无符号位移下溢的绝对安全屏障。
+          同时，结合<strong>空穴上浮单向覆盖</strong>，省去了至少一半的内存写指令。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * PriorityQueue siftUpComparable 状态机模拟核心
+     * 严谨复刻 OpenJDK 的原子微指令步骤，支持全自定义数据集、重试重放与交互探针
+     */
+    class SiftUpVisualizer {
+      constructor() {
+        this.capacity = 11;
+        this.queue = new Array(this.capacity).fill(null);
+        this.size = 0;
+
+        // 当前加载的数据集
+        this.currentDataset = [5, 1, 3, 8, 2];
+
+        // 微操作历史状态快照栈（支持 100% 幂等任意单步后退）
+        this.history = [];
+        this.currentIndex = 0;
+
+        this.isPlaying = false;
+        this.playTimer = null;
+        this.playSpeed = 900;
+
+        // 当前探针选中的节点索引
+        this.probeIndex = 1;
+
+        this.initDOM();
+        this.initArrayGrid();
+        this.bindEvents();
+        this.loadCustomSequence(this.currentDataset, false);
+        this.updateProbePanel(1);
+      }
+
+      initDOM() {
+        this.dom = {
+          treeSvg: document.getElementById('tree-svg'),
+          treeEdges: document.getElementById('tree-edges'),
+          treeProbeEdges: document.getElementById('tree-probe-edges'),
+          treeNodes: document.getElementById('tree-nodes'),
+          treeStatusBadge: document.getElementById('tree-status-badge'),
+          floatingKeyBox: document.getElementById('floating-key-box'),
+          floatingKeyVal: document.getElementById('floating-key-val'),
+          arrayGrid: document.getElementById('array-grid'),
+          // 数据集控制
+          inputSequence: document.getElementById('input-sequence'),
+          btnRunCustom: document.getElementById('btn-run-custom'),
+          btnRetry: document.getElementById('btn-retry'),
+          btnRandomSeq: document.getElementById('btn-random-seq'),
+          presetChips: document.querySelectorAll('.chip-btn'),
+          pipelineChips: document.getElementById('pipeline-chips'),
+          // 单个 offer
+          btnCustom: document.getElementById('btn-offer-custom'),
+          inputVal: document.getElementById('input-offer-val'),
+          // 播放与单步
+          btnReset: document.getElementById('btn-reset'),
+          btnPrev: document.getElementById('btn-prev'),
+          btnNext: document.getElementById('btn-next'),
+          btnPlayPause: document.getElementById('btn-play-pause'),
+          selectSpeed: document.getElementById('select-speed'),
+          stepIndicator: document.getElementById('step-indicator'),
+          progressBar: document.getElementById('progress-bar'),
+          valK: document.getElementById('val-k'),
+          valKey: document.getElementById('val-key'),
+          valParent: document.getElementById('val-parent'),
+          valE: document.getElementById('val-e'),
+          valCmp: document.getElementById('val-cmp'),
+          narrativeTitle: document.getElementById('narrative-title'),
+          narrativeDesc: document.getElementById('narrative-desc'),
+          narrativeTip: document.getElementById('narrative-tip'),
+          narrativeTipText: document.getElementById('narrative-tip-text'),
+          // 探针 DOM
+          probeCurrentLabel: document.getElementById('probe-current-label'),
+          probeParentFormula: document.getElementById('probe-parent-formula'),
+          probeParentDesc: document.getElementById('probe-parent-desc'),
+          probeLeftFormula: document.getElementById('probe-left-formula'),
+          probeLeftDesc: document.getElementById('probe-left-desc'),
+          probeRightFormula: document.getElementById('probe-right-formula'),
+          probeRightDesc: document.getElementById('probe-right-desc'),
+        };
+      }
+
+      initArrayGrid() {
+        this.dom.arrayGrid.innerHTML = '';
+        for (let i = 0; i < this.capacity; i++) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'array-cell-wrapper';
+          wrapper.id = `cell-wrap-${i}`;
+          wrapper.title = `点击触发 [k=${i}] 的映射公式探针`;
+          wrapper.addEventListener('click', () => this.setProbeNode(i));
+
+          const label = document.createElement('div');
+          label.className = 'array-index-label';
+          label.textContent = `[${i}]`;
+
+          const cell = document.createElement('div');
+          cell.className = 'array-cell empty';
+          cell.id = `cell-${i}`;
+          cell.textContent = '-';
+
+          const tags = document.createElement('div');
+          tags.className = 'pointer-tags';
+          tags.id = `tags-${i}`;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(cell);
+          wrapper.appendChild(tags);
+          this.dom.arrayGrid.appendChild(wrapper);
+        }
+      }
+
+      // 解析用户输入的序列字符串（支持逗号、空格、方括号及负数）
+      parseInputSequence(text) {
+        if (!text) return [];
+        const cleaned = text.replace(/[\[\]]/g, ' ').replace(/,/g, ' ');
+        const tokens = cleaned.trim().split(/\s+/);
+        const result = [];
+        for (const token of tokens) {
+          if (token === '') continue;
+          const val = parseInt(token, 10);
+          if (!isNaN(val)) {
+            result.push(val);
+          }
+        }
+        return result;
+      }
+
+      bindEvents() {
+        // 自定义序列加载并执行
+        this.dom.btnRunCustom.addEventListener('click', () => {
+          const arr = this.parseInputSequence(this.dom.inputSequence.value);
+          if (arr.length === 0) {
+            alert("请输入有效的数字序列，例如：5, 1, 3, 8, 2");
+            return;
+          }
+          if (arr.length > 10) {
+            alert("为保证二叉树与数组的最佳视觉展示效果，单次最多支持 10 个数字。已自动截取前 10 个。");
+            this.loadCustomSequence(arr.slice(0, 10), true);
+          } else {
+            this.loadCustomSequence(arr, true);
+          }
+        });
+
+        // 快捷按键：回车键提交运行
+        this.dom.inputSequence.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            this.dom.btnRunCustom.click();
+          }
+        });
+
+        // 重试当前数据 (Retry)
+        this.dom.btnRetry.addEventListener('click', () => {
+          this.retryCurrentSequence();
+        });
+
+        // 随机生成 5 个数字
+        this.dom.btnRandomSeq.addEventListener('click', () => {
+          const randArr = [];
+          for (let i = 0; i < 5; i++) {
+            randArr.push(Math.floor(Math.random() * 30) + 1);
+          }
+          this.dom.inputSequence.value = randArr.join(', ');
+          this.loadCustomSequence(randArr, true);
+          this.updateActiveChip(null);
+        });
+
+        // 预设芯片点击切换
+        this.dom.presetChips.forEach(chip => {
+          chip.addEventListener('click', () => {
+            const seqStr = chip.getAttribute('data-seq');
+            this.dom.inputSequence.value = seqStr;
+            const arr = this.parseInputSequence(seqStr);
+            this.loadCustomSequence(arr, true);
+            this.updateActiveChip(chip);
+          });
+        });
+
+        // 单个追加 offer
+        this.dom.btnCustom.addEventListener('click', () => {
+          const val = parseInt(this.dom.inputVal.value, 10);
+          if (!isNaN(val)) {
+            this.appendOffer(val);
+            this.dom.inputVal.value = Math.floor(Math.random() * 20) + 1;
+          }
+        });
+
+        // 播放控制
+        this.dom.btnReset.addEventListener('click', () => this.reset());
+        this.dom.btnNext.addEventListener('click', () => this.stepNext());
+        this.dom.btnPrev.addEventListener('click', () => this.stepPrev());
+        this.dom.btnPlayPause.addEventListener('click', () => this.togglePlay());
+        this.dom.selectSpeed.addEventListener('change', (e) => {
+          this.playSpeed = parseInt(e.target.value, 10);
+          if (this.isPlaying) {
+            this.pause();
+            this.play();
+          }
+        });
+      }
+
+      updateActiveChip(targetChip) {
+        this.dom.presetChips.forEach(chip => {
+          chip.classList.toggle('active', chip === targetChip);
+        });
+      }
+
+      // 加载自定义数据序列并生成微操作步骤
+      loadCustomSequence(arr, autoPlay = true) {
+        this.pause();
+        this.currentDataset = [...arr];
+        this.dom.inputSequence.value = arr.join(', ');
+
+        this.queue = new Array(this.capacity).fill(null);
+        this.size = 0;
+        this.history = [];
+        this.currentIndex = 0;
+
+        this.createSnapshot(`准备载入测试序列：[${arr.join(', ')}]。点击下一步或播放开始逐个插入。`, {
+          title: "数据序列就绪",
+          highlightLine: 0
+        });
+
+        arr.forEach(val => this.recordOfferLifecycle(val));
+
+        this.renderPipelineChips();
+        this.renderCurrentState();
+
+        if (autoPlay) {
+          this.play();
+        }
+      }
+
+      // 重试当前数据
+      retryCurrentSequence() {
+        if (!this.currentDataset || this.currentDataset.length === 0) {
+          this.currentDataset = [5, 1, 3, 8, 2];
+        }
+        this.loadCustomSequence(this.currentDataset, true);
+      }
+
+      // 渲染顶部数据流水线徽章
+      renderPipelineChips() {
+        this.dom.pipelineChips.innerHTML = '';
+        this.currentDataset.forEach((val, idx) => {
+          const badge = document.createElement('span');
+          badge.className = 'pipe-badge';
+          badge.id = `pipe-chip-${idx}`;
+          badge.textContent = `[${idx}]: ${val}`;
+          this.dom.pipelineChips.appendChild(badge);
+        });
+      }
+
+      // 设置探针选中的节点
+      setProbeNode(k) {
+        this.probeIndex = k;
+        this.updateProbePanel(k);
+        this.renderCurrentState();
+      }
+
+      // 更新探针展示板上的代数公式推导
+      updateProbePanel(k) {
+        this.dom.probeCurrentLabel.textContent = `当前选中节点 [k = ${k}]`;
+
+        // 1. 父节点计算
+        if (k === 0) {
+          this.dom.probeParentFormula.textContent = "无 (已是根节点，没有父节点)";
+          this.dom.probeParentDesc.textContent = "根节点位于堆顶。在 Java 中通过 while (k > 0) 阻止了下标越界。";
+        } else {
+          const p = (k - 1) >>> 1;
+          const isLeft = (k % 2 !== 0);
+          this.dom.probeParentFormula.textContent = `(${k} - 1) >>> 1 = ${k - 1} >>> 1 = ${p}`;
+          if (isLeft) {
+            this.dom.probeParentDesc.textContent = `当前 k=${k} 是奇数 (左孩子)，减 1 后整除 2 得到父节点 ${p}。`;
+          } else {
+            this.dom.probeParentDesc.textContent = `当前 k=${k} 是偶数 (右孩子)，减 1 后为奇数，无符号右移自动舍弃 0.5 得到父节点 ${p}。`;
+          }
+        }
+
+        // 2. 左孩子计算
+        const left = 2 * k + 1;
+        this.dom.probeLeftFormula.textContent = `2 × ${k} + 1 = ${left}`;
+        if (left < this.capacity) {
+          this.dom.probeLeftDesc.textContent = `映射到底层数组索引 [${left}]。若有元素则居于左下侧。`;
+        } else {
+          this.dom.probeLeftDesc.textContent = `计算结果 [${left}] 超出当前展示容量 (${this.capacity})，属深层叶子。`;
+        }
+
+        // 3. 右孩子计算
+        const right = 2 * k + 2;
+        this.dom.probeRightFormula.textContent = `2 × ${k} + 2 = ${right}`;
+        if (right < this.capacity) {
+          this.dom.probeRightDesc.textContent = `映射到底层数组索引 [${right}]，与左孩子 [${left}] 在内存中严格相邻！`;
+        } else {
+          this.dom.probeRightDesc.textContent = `计算结果 [${right}] 超出当前展示容量 (${this.capacity})。`;
+        }
+      }
+
+      // 创建一个状态快照
+      createSnapshot(desc, options = {}) {
+        const snap = {
+          queue: [...this.queue],
+          size: this.size,
+          k: options.k !== undefined ? options.k : null,
+          key: options.key !== undefined ? options.key : null,
+          parent: options.parent !== undefined ? options.parent : null,
+          e: options.e !== undefined ? options.e : null,
+          cmpResult: options.cmpResult !== undefined ? options.cmpResult : null,
+          holeIndex: options.holeIndex !== undefined ? options.holeIndex : null,
+          highlightLine: options.highlightLine || 0,
+          title: options.title || "执行步骤",
+          desc: desc,
+          tip: options.tip || null,
+        };
+        this.history.push(snap);
+      }
+
+      // 录入一个 offer(x) 的全生命周期微步骤
+      recordOfferLifecycle(x) {
+        const i = this.size;
+        this.size = i + 1;
+
+        // 步骤 1: 进入 offer 判定
+        this.createSnapshot(`调用 queue.offer(${x})。当前实际元素个数 size = ${i}，新分配下标 i = ${i}。`, {
+          title: `offer(${x}) 开始`,
+          highlightLine: 1,
+          key: x,
+          tip: i === 0 ? "这是队列中的首个元素，将直接放入根节点 queue[0]，无需任何堆调整。" : `非根节点插入，将触发 siftUp(k = ${i}, x = ${x})。`
+        });
+
+        if (i === 0) {
+          this.queue[0] = x;
+          this.createSnapshot(`因为 i == 0（空堆），直接执行 queue[0] = ${x}。堆顶建立完毕！`, {
+            title: `直接写入根节点`,
+            highlightLine: 11,
+            key: x,
+            k: 0
+          });
+          return;
+        }
+
+        // 进入 siftUpComparable(i, x)
+        let k = i;
+        const key = x;
+
+        // Line 2: 暂存 key 并开辟空穴
+        this.createSnapshot(`执行 Comparable key = (Comparable) x; 将元素 ${key} 暂存在寄存器/局部变量 key 中，位置 k = ${k} 视作空穴（待填充位）。`, {
+          title: `暂存 key 并定位初始空穴`,
+          highlightLine: 2,
+          k: k,
+          key: key,
+          holeIndex: k,
+          tip: "【JDK 关键优化】注意此时并不急着将数据写入 queue[k]，而是让空穴向上攀爬，减少交换开销！"
+        });
+
+        while (k > 0) {
+          // Line 3: while 循环条件检查
+          this.createSnapshot(`检查循环条件 while (k > 0)：当前 k = ${k} > 0 成立，空穴尚未到达堆顶，继续向上探测。`, {
+            title: `检查是否到达堆顶`,
+            highlightLine: 3,
+            k: k,
+            key: key,
+            holeIndex: k
+          });
+
+          // Line 4: 计算 parent = (k - 1) >>> 1
+          const parent = (k - 1) >>> 1;
+          this.createSnapshot(`计算父节点索引 parent = (${k} - 1) >>> 1 = ${parent}。`, {
+            title: `计算父节点索引`,
+            highlightLine: 4,
+            k: k,
+            key: key,
+            parent: parent,
+            holeIndex: k,
+            tip: "位运算 (k - 1) >>> 1 比除以 2 更加高效，是完全二叉树父子节点映射的核心计算！"
+          });
+
+          // Line 5: 获取父节点 Object e = queue[parent]
+          const e = this.queue[parent];
+          this.createSnapshot(`读取父节点元素值：e = queue[${parent}] = ${e}。`, {
+            title: `读取父节点元素`,
+            highlightLine: 5,
+            k: k,
+            key: key,
+            parent: parent,
+            e: e,
+            holeIndex: k
+          });
+
+          // Line 6: 比较 key 与父节点 e
+          const cmp = key >= e;
+          if (cmp) {
+            this.createSnapshot(`比较：key(${key}) >= e(${e}) 判定为 true！满足小顶堆性质（父节点 ≤ 子节点），触发 break 跳出循环！`, {
+              title: `比较堆序性 (满足)`,
+              highlightLine: 6,
+              k: k,
+              key: key,
+              parent: parent,
+              e: e,
+              cmpResult: true,
+              holeIndex: k,
+              tip: `堆序性已恢复：当前空穴位置 k = ${k} 正好就是 ${key} 的合法居所。`
+            });
+
+            // Line 7: break
+            this.createSnapshot(`执行 break，停止上浮。当前空穴固定在 k = ${k}。`, {
+              title: `跳出上浮循环`,
+              highlightLine: 7,
+              k: k,
+              key: key,
+              holeIndex: k
+            });
+            break;
+          } else {
+            this.createSnapshot(`比较：key(${key}) < e(${e})，打破了小顶堆性质！父节点必须下移，空穴必须上浮！`, {
+              title: `比较堆序性 (打破堆序)`,
+              highlightLine: 6,
+              k: k,
+              key: key,
+              parent: parent,
+              e: e,
+              cmpResult: false,
+              holeIndex: k,
+              tip: `由于 key(${key}) 比父节点(${e}) 更小，所以父节点 ${e} 必须移下来给更小者让位。`
+            });
+
+            // Line 8: 父节点下移 queue[k] = e
+            this.queue[k] = e;
+            this.createSnapshot(`执行 queue[${k}] = e (${e})：父节点值下移滑入当前空穴。位置 ${k} 填入 ${e}，空穴转移至位置 ${parent}！`, {
+              title: `父节点下移 (Sliding Down)`,
+              highlightLine: 8,
+              k: k,
+              key: key,
+              parent: parent,
+              e: e,
+              holeIndex: parent,
+              tip: "重点：此处单向移动父节点，完全没有 swap 交换操作，极大提升了 CPU 缓存效率！"
+            });
+
+            // Line 9: 空穴上移 k = parent
+            k = parent;
+            this.createSnapshot(`更新空穴索引：k = parent = ${parent}。下一轮循环将以此空穴为基准继续检测。`, {
+              title: `空穴索引上移`,
+              highlightLine: 9,
+              k: k,
+              key: key,
+              holeIndex: k
+            });
+          }
+        }
+
+        if (k === 0) {
+          // 到达堆顶退出
+          this.createSnapshot(`循环结束：k == 0 已到达堆顶（根节点），无更高父节点。准备落入空穴！`, {
+            title: `到达堆顶终止`,
+            highlightLine: 3,
+            k: 0,
+            key: key,
+            holeIndex: 0
+          });
+        }
+
+        // Line 11: 填入空穴 queue[k] = key
+        this.queue[k] = key;
+        this.createSnapshot(`执行 queue[${k}] = key (${key})：将暂存的 key 正式写入最终空穴！offer(${key}) 成功！`, {
+          title: `落穴完成 (queue[k] = key)`,
+          highlightLine: 11,
+          k: k,
+          key: key,
+          tip: `当前堆中全部元素：[${this.queue.slice(0, this.size).join(', ')}]，依然严格维持二叉小顶堆性质。`
+        });
+      }
+
+      // 追加单个自定义数字
+      appendOffer(val) {
+        if (this.size >= 10) {
+          alert("演示空间为 11 个元素以内最佳，请先重置后再添加。");
+          return;
+        }
+        // 如果当前处在历史中间，先截断到最新状态
+        if (this.currentIndex < this.history.length - 1) {
+          const latest = this.history[this.history.length - 1];
+          this.queue = [...latest.queue];
+          this.size = latest.size;
+        }
+        this.currentDataset.push(val);
+        this.dom.inputSequence.value = this.currentDataset.join(', ');
+        this.renderPipelineChips();
+        this.recordOfferLifecycle(val);
+        this.renderCurrentState();
+      }
+
+      reset() {
+        this.pause();
+        this.queue = new Array(this.capacity).fill(null);
+        this.size = 0;
+        this.history = [];
+        this.currentIndex = 0;
+        this.createSnapshot("已重置为空堆。请点击“加载并运行”或“重试当前数据”。", {
+          title: "堆重置完毕",
+          highlightLine: 0
+        });
+        this.renderCurrentState();
+      }
+
+      stepNext() {
+        if (this.currentIndex < this.history.length - 1) {
+          this.currentIndex++;
+          this.renderCurrentState();
+        } else {
+          this.pause();
+        }
+      }
+
+      stepPrev() {
+        if (this.currentIndex > 0) {
+          this.currentIndex--;
+          this.renderCurrentState();
+        }
+      }
+
+      togglePlay() {
+        if (this.isPlaying) {
+          this.pause();
+        } else {
+          this.play();
+        }
+      }
+
+      play() {
+        if (this.currentIndex >= this.history.length - 1) {
+          this.currentIndex = 0;
+        }
+        this.isPlaying = true;
+        this.dom.btnPlayPause.textContent = "⏸ 暂停";
+        this.dom.btnPlayPause.classList.remove('btn-success');
+        this.dom.btnPlayPause.classList.add('btn-secondary');
+
+        this.playTimer = setInterval(() => {
+          if (this.currentIndex < this.history.length - 1) {
+            this.stepNext();
+          } else {
+            this.pause();
+          }
+        }, this.playSpeed);
+      }
+
+      pause() {
+        this.isPlaying = false;
+        clearInterval(this.playTimer);
+        this.playTimer = null;
+        this.dom.btnPlayPause.textContent = "⏯ 自动播放";
+        this.dom.btnPlayPause.classList.remove('btn-secondary');
+        this.dom.btnPlayPause.classList.add('btn-success');
+      }
+
+      // 渲染当前快照的所有视图
+      renderCurrentState() {
+        const snap = this.history[this.currentIndex];
+        if (!snap) return;
+
+        // 1. 进度指示器
+        const total = this.history.length - 1;
+        this.dom.stepIndicator.textContent = `Step ${this.currentIndex} / ${total}`;
+        const pct = total > 0 ? (this.currentIndex / total) * 100 : 0;
+        this.dom.progressBar.style.width = `${pct}%`;
+
+        // 按钮状态
+        this.dom.btnPrev.disabled = this.currentIndex === 0;
+        this.dom.btnNext.disabled = this.currentIndex === total;
+
+        // 2. 变量监控区
+        this.dom.valK.textContent = snap.k !== null ? snap.k : '-';
+        this.dom.valKey.textContent = snap.key !== null ? snap.key : '-';
+        this.dom.valParent.textContent = snap.parent !== null ? snap.parent : '-';
+        this.dom.valE.textContent = snap.e !== null ? snap.e : '-';
+
+        if (snap.cmpResult !== null) {
+          this.dom.valCmp.textContent = snap.cmpResult ? "true (>= 0)" : "false (< 0)";
+          this.dom.valCmp.className = `var-value ${snap.cmpResult ? 'highlight-true' : 'highlight-false'}`;
+        } else {
+          this.dom.valCmp.textContent = '-';
+          this.dom.valCmp.className = 'var-value';
+        }
+
+        // 3. 悬浮 key 展示板
+        if (snap.key !== null) {
+          this.dom.floatingKeyBox.style.display = 'flex';
+          this.dom.floatingKeyVal.textContent = snap.key;
+        } else {
+          this.dom.floatingKeyBox.style.display = 'none';
+        }
+
+        // 4. 叙事文本
+        this.dom.narrativeTitle.textContent = snap.title;
+        this.dom.narrativeDesc.textContent = snap.desc;
+        if (snap.tip) {
+          this.dom.narrativeTip.style.display = 'flex';
+          this.dom.narrativeTipText.textContent = snap.tip;
+        } else {
+          this.dom.narrativeTip.style.display = 'none';
+        }
+
+        // 5. 源码行高亮
+        for (let l = 1; l <= 12; l++) {
+          const lineEl = document.getElementById(`code-line-${l}`);
+          if (lineEl) {
+            lineEl.classList.toggle('active', l === snap.highlightLine);
+          }
+        }
+
+        // 6. 更新流水线状态芯片高亮
+        this.updatePipelineProgress(snap);
+
+        // 7. 渲染物理数组视图
+        this.renderArrayView(snap);
+
+        // 8. 渲染逻辑二叉树 SVG 视图
+        this.renderTreeView(snap);
+      }
+
+      // 更新流水线状态高亮
+      updatePipelineProgress(snap) {
+        if (!this.currentDataset) return;
+        const currentActiveKey = snap.key;
+        this.currentDataset.forEach((val, idx) => {
+          const badge = document.getElementById(`pipe-chip-${idx}`);
+          if (!badge) return;
+          badge.className = 'pipe-badge';
+          if (val === currentActiveKey) {
+            badge.classList.add('active');
+          } else if (idx < snap.size) {
+            badge.classList.add('done');
+          }
+        });
+      }
+
+      // 渲染物理数组视图
+      renderArrayView(snap) {
+        const pProbe = this.probeIndex > 0 ? (this.probeIndex - 1) >>> 1 : null;
+        const leftProbe = 2 * this.probeIndex + 1;
+        const rightProbe = 2 * this.probeIndex + 2;
+
+        for (let i = 0; i < this.capacity; i++) {
+          const cell = document.getElementById(`cell-${i}`);
+          const tags = document.getElementById(`tags-${i}`);
+          if (!cell || !tags) continue;
+
+          tags.innerHTML = '';
+          const val = snap.queue[i];
+
+          cell.className = 'array-cell';
+
+          if (i === snap.holeIndex) {
+            // 当前是空穴
+            cell.classList.add('hole');
+            cell.textContent = '穴 (k)';
+          } else if (val !== null) {
+            cell.textContent = val;
+            if (i === snap.parent) {
+              cell.classList.add('parent-highlight');
+            }
+          } else {
+            cell.classList.add('empty');
+            cell.textContent = '-';
+          }
+
+          // 探针模式下的特殊边框渲染
+          if (i === this.probeIndex) {
+            cell.classList.add('probe-current');
+          } else if (i === pProbe) {
+            cell.classList.add('probe-parent');
+          } else if (i === leftProbe) {
+            cell.classList.add('probe-left');
+          } else if (i === rightProbe) {
+            cell.classList.add('probe-right');
+          }
+
+          // 添加指针徽章
+          if (i === snap.k) {
+            const badge = document.createElement('span');
+            badge.className = 'pointer-badge pointer-k';
+            badge.textContent = '↑ k';
+            tags.appendChild(badge);
+          }
+
+          if (i === snap.parent && snap.parent !== null) {
+            const badge = document.createElement('span');
+            badge.className = 'pointer-badge pointer-parent';
+            badge.textContent = '↑ parent';
+            tags.appendChild(badge);
+          }
+        }
+      }
+
+      // 二叉树节点坐标规划 (最多支持 4 层，15 个节点)
+      getNodeCoord(index) {
+        const width = 700;
+        const levelY = [50, 130, 210, 290];
+
+        // 计算节点所在的树深度 depth 和同层偏移 pos
+        const depth = Math.floor(Math.log2(index + 1));
+        const pos = index - (Math.pow(2, depth) - 1);
+        const countInLevel = Math.pow(2, depth);
+
+        // 水平间距均分
+        const stepX = width / (countInLevel + 1);
+        const x = stepX * (pos + 1);
+        const y = levelY[depth] || 320;
+
+        return { x, y };
+      }
+
+      // 渲染逻辑二叉树 SVG 视图
+      renderTreeView(snap) {
+        this.dom.treeEdges.innerHTML = '';
+        this.dom.treeProbeEdges.innerHTML = '';
+        this.dom.treeNodes.innerHTML = '';
+
+        // 展示节点数：至少包含探针关联的节点以及当前已有的节点
+        const activeMax = Math.max(
+          snap.size,
+          snap.holeIndex !== null ? snap.holeIndex + 1 : 0,
+          this.probeIndex + 1,
+          2 * this.probeIndex + 3
+        );
+        const nodeCount = Math.min(15, Math.max(7, activeMax));
+        this.dom.treeStatusBadge.textContent = `有效节点数: ${snap.size}`;
+
+        const pProbe = this.probeIndex > 0 ? (this.probeIndex - 1) >>> 1 : null;
+        const leftProbe = 2 * this.probeIndex + 1;
+        const rightProbe = 2 * this.probeIndex + 2;
+
+        // 1. 绘制基本树连线
+        for (let i = 1; i < nodeCount; i++) {
+          const parentIdx = (i - 1) >>> 1;
+          const childCoord = this.getNodeCoord(i);
+          const parentCoord = this.getNodeCoord(parentIdx);
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', parentCoord.x);
+          line.setAttribute('y1', parentCoord.y);
+          line.setAttribute('x2', childCoord.x);
+          line.setAttribute('y2', childCoord.y);
+
+          // 连线高亮规则：如果当前正在该子节点与父节点之间进行比较
+          const isComparingEdge = (i === snap.k && parentIdx === snap.parent) || (i === snap.holeIndex && parentIdx === snap.parent);
+          line.setAttribute('stroke', isComparingEdge ? '#fbbf24' : '#334155');
+          line.setAttribute('stroke-width', isComparingEdge ? '3.5' : '1.8');
+          if (isComparingEdge) {
+            line.setAttribute('stroke-dasharray', '5,3');
+          }
+          this.dom.treeEdges.appendChild(line);
+        }
+
+        // 2. 绘制探针关联连线
+        if (pProbe !== null && pProbe < nodeCount && this.probeIndex < nodeCount) {
+          const cCoord = this.getNodeCoord(this.probeIndex);
+          const pCoord = this.getNodeCoord(pProbe);
+          const pLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          pLine.setAttribute('x1', pCoord.x);
+          pLine.setAttribute('y1', pCoord.y);
+          pLine.setAttribute('x2', cCoord.x);
+          pLine.setAttribute('y2', cCoord.y);
+          pLine.setAttribute('stroke', '#fbbf24');
+          pLine.setAttribute('stroke-width', '2.5');
+          pLine.setAttribute('stroke-dasharray', '4,3');
+          this.dom.treeProbeEdges.appendChild(pLine);
+        }
+
+        // 3. 绘制节点
+        for (let i = 0; i < nodeCount; i++) {
+          const coord = this.getNodeCoord(i);
+          const val = (i < snap.queue.length) ? snap.queue[i] : null;
+
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('transform', `translate(${coord.x}, ${coord.y})`);
+          g.style.cursor = 'pointer';
+          g.addEventListener('click', () => this.setProbeNode(i));
+
+          // 节点圆形底色
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('r', '22');
+
+          // 节点文本
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dy', '6');
+          text.setAttribute('font-family', '"JetBrains Mono", Consolas, monospace');
+          text.setAttribute('font-weight', '700');
+          text.setAttribute('font-size', '14');
+
+          // 索引角标
+          const idxText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          idxText.setAttribute('text-anchor', 'middle');
+          idxText.setAttribute('dy', '-28');
+          idxText.setAttribute('fill', '#64748b');
+          idxText.setAttribute('font-size', '10');
+          idxText.textContent = `[${i}]`;
+          g.appendChild(idxText);
+
+          // 探针外部发光光环
+          let ringColor = null;
+          if (i === this.probeIndex) {
+            ringColor = '#10b981'; // 绿色光环：当前探测节点
+          } else if (i === pProbe) {
+            ringColor = '#fbbf24'; // 金色光环：父节点
+          } else if (i === leftProbe) {
+            ringColor = '#38bdf8'; // 青色光环：左孩子
+          } else if (i === rightProbe) {
+            ringColor = '#c084fc'; // 紫色光环：右孩子
+          }
+
+          if (ringColor) {
+            const probeRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            probeRing.setAttribute('r', '27');
+            probeRing.setAttribute('fill', 'none');
+            probeRing.setAttribute('stroke', ringColor);
+            probeRing.setAttribute('stroke-width', '2.5');
+            probeRing.setAttribute('stroke-dasharray', '4,2');
+            g.appendChild(probeRing);
+          }
+
+          // 样式判定
+          if (i === snap.holeIndex) {
+            // 空穴状态
+            circle.setAttribute('fill', 'rgba(244, 63, 94, 0.15)');
+            circle.setAttribute('stroke', '#f43f5e');
+            circle.setAttribute('stroke-width', '2.5');
+            circle.setAttribute('stroke-dasharray', '5,3');
+            text.setAttribute('fill', '#f43f5e');
+            text.setAttribute('font-size', '11');
+            text.textContent = '穴';
+          } else if (i === snap.parent) {
+            // 算法执行中的父节点
+            circle.setAttribute('fill', '#d97706');
+            circle.setAttribute('stroke', '#fbbf24');
+            circle.setAttribute('stroke-width', '3');
+            text.setAttribute('fill', '#ffffff');
+            text.textContent = val !== null ? val : '';
+          } else if (val !== null) {
+            // 正常填充节点
+            circle.setAttribute('fill', '#0284c7');
+            circle.setAttribute('stroke', '#38bdf8');
+            circle.setAttribute('stroke-width', '1.5');
+            text.setAttribute('fill', '#ffffff');
+            text.textContent = val;
+          } else {
+            // 空白占位节点
+            circle.setAttribute('fill', '#1e293b');
+            circle.setAttribute('stroke', '#334155');
+            circle.setAttribute('stroke-width', '1');
+            text.setAttribute('fill', '#475569');
+            text.textContent = '-';
+          }
+
+          g.appendChild(circle);
+          g.appendChild(text);
+          this.dom.treeNodes.appendChild(g);
+        }
+      }
+    }
+
+    // 页面启动初始化
+    window.addEventListener('DOMContentLoaded', () => {
+      window.pqVisualizer = new SiftUpVisualizer();
+    });
+  </script>
+</body>
+</html>
